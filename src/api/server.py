@@ -7,6 +7,7 @@ Endpoints:
   GET  /v1/info             — OS info and loaded skills
   POST /v1/route            — Route a prompt through the LLM Router
   POST /v1/complete         — Direct LLM completion (bypass routing logic)
+  GET  /v1/fleet            — Named Ollama fleet routing table
   GET  /v1/skills           — List available skills
   GET  /v1/skills/{name}    — Get skill details
   POST /v1/skills/{name}/invoke — Invoke a skill
@@ -87,8 +88,20 @@ app.add_middleware(
 
 class RouteRequest(BaseModel):
     prompt: str = Field(..., description="The prompt to route and complete")
-    model_preference: Optional[str] = Field(None, description="Preferred model (optional)")
     system: Optional[str] = Field(None, description="System prompt override")
+    intent: Optional[str] = Field(
+        None,
+        description="Routing intent hint — maps to fleet target. "
+                    "e.g. 'code', 'reason', 'agent', 'fast', 'analyze', 'debug', 'plan'",
+    )
+    fleet_target: Optional[str] = Field(
+        None,
+        description="Explicit fleet target: agent | reason | code | default | fast",
+    )
+    model_preference: Optional[str] = Field(
+        None,
+        description="Exact model string or fleet alias (overrides intent/fleet_target)",
+    )
     max_tokens: int = Field(2048, ge=1, le=32768)
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     stream: bool = Field(False, description="Stream response (future support)")
@@ -112,6 +125,7 @@ class RouteResponse(BaseModel):
     content: str
     model_used: str
     provider: str
+    fleet_target: Optional[str] = None   # e.g. "code", "reason", "agent", "fast"
     routed: bool
     latency_ms: float
     tokens_used: Optional[int] = None
@@ -185,6 +199,8 @@ async def route_prompt(
         result = await r.route(
             prompt=req.prompt,
             system=req.system,
+            intent=req.intent,
+            fleet_target=req.fleet_target,
             model_preference=req.model_preference,
             max_tokens=req.max_tokens,
             temperature=req.temperature,
@@ -199,6 +215,7 @@ async def route_prompt(
         content=result["content"],
         model_used=result["model"],
         provider=result["provider"],
+        fleet_target=result.get("fleet_target"),
         routed=True,
         latency_ms=round(latency_ms, 2),
         tokens_used=result.get("tokens"),
@@ -231,6 +248,17 @@ async def direct_complete(
         "latency_ms": round((time.time() - start) * 1000, 2),
         "tokens_used": result.get("tokens"),
     }
+
+
+@app.get("/v1/fleet", tags=["Router"])
+async def fleet_info(r: LLMRouter = Depends(get_router)):
+    """
+    Return the full Ollama fleet routing table — model per target,
+    health status, and all recognized intent keywords.
+
+    Fleet targets: agent | reason | code | default | fast
+    """
+    return r.fleet_info()
 
 
 @app.get("/v1/skills", tags=["Skills"])
