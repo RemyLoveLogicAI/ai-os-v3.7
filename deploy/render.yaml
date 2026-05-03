@@ -1,0 +1,35 @@
+# Render.com deployment config for AI OS v3.7
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: ai-os-v3.7
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile
+    dockerContext: .
+    plan: starter           # upgrade to standard for production
+    region: oregon          # us-west-2
+    branch: main
+    autoDeploy: true
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: AI_OS_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PORT
+        value: 8000
+      - key: OLLAMA_BASE_URL
+        sync: false         # set in Render dashboard
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetMemoryPercent: 80
+      targetCPUPercent: 70

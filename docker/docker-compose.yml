@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  ai-os:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: lovelogicai/ai-os:3.7.0
+    container_name: ai-os
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - AI_OS_ENV=production
+      - LOG_LEVEL=INFO
+      - OLLAMA_BASE_URL=http://ollama:11434
+    env_file:
+      - ../.env
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    volumes:
+      - skills_data:/app/skills
+    networks:
+      - ai-os-net
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - ai-os-net
+
+volumes:
+  ollama_data:
+  skills_data:
+
+networks:
+  ai-os-net:
+    driver: bridge
