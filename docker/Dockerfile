@@ -17,7 +17,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     AI_OS_ENV=production \
-    PORT=8000
+    PORT=8000 \
+    PYTHONPATH=/app/src
 
 WORKDIR /app
 
@@ -32,7 +33,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Copy source
 COPY src/ ./src/
-COPY skills/ ./skills/ 2>/dev/null || mkdir -p ./skills
+RUN mkdir -p ./skills
 
 # Create non-root user
 RUN useradd -m -u 1000 aios && chown -R aios:aios /app
